@@ -1,0 +1,87 @@
+@startuml Component Diagram
+!theme plain
+
+title Matrix Architecture Component Diagram
+
+' The diagram captures the high‑level components and interactions within the Matrix
+' protocol. The architecture is decentralised: users communicate with their
+' local homeserver via the client–server API; homeservers replicate data to
+' other homeservers via the federation (server–server API) and rely on
+' auxiliary services such as identity servers and application services (used
+' for bridges and integrations). A media repository stores attachments and
+' thumbnails for both local and remote media【483473567520339†L132-L140】.
+
+package "Matrix Ecosystem" {
+  ' --- Client Layer ---
+  [Mobile Client (Element iOS/Android)] as mobile_client
+  [Desktop Client (Element Desktop)] as desktop_client
+  [Web Client (Element Web)] as web_client
+
+  ' --- Server Layer ---
+  package "Server Components" {
+    [Home Server (Synapse/Dendrite/etc.)] as home_server
+    [Application Service / Bridge] as app_service
+    [Identity Server] as identity_server
+    [Push Gateway] as push_gateway
+  }
+
+  ' --- Data Layer ---
+  package "Data Layer" {
+    [Event & State Store (DB)] as event_db
+    [Media Repository] as media_repo
+    [Cache (Redis/In‑Memory)] as cache
+  }
+
+  ' --- Interface APIs ---
+  () "Client‑Server API (HTTP REST)" as cs_api
+  () "Server‑Server API (Federation)" as ss_api
+  () "Application Service API" as as_api
+  () "Identity Service API" as id_api
+  () "Media API (Upload/Download)" as media_api
+  () "Push Notification API" as push_api
+
+  ' --- Federated Network ---
+  package "Federated Network" {
+    [Remote Home Servers] as remote_server
+  }
+
+  ' --- External Systems ---
+  package "External Ecosystem" {
+    [Other Chat Networks (IRC/Slack/XMPP/etc.)] as external_networks
+    [Push Providers (FCM/APNs)] as push_providers
+    [3rd‑Party Identity Providers] as external_idp
+  }
+
+  ' --- Client connections ---
+  mobile_client -down-( cs_api
+  desktop_client -down-( cs_api
+  web_client -down-( cs_api
+  cs_api -down- home_server
+
+  ' --- Homeserver to Data Layer ---
+  home_server -down-( event_db
+  home_server -down-( cache
+  home_server -down-( media_api
+  media_api -down- media_repo
+
+  ' --- Homeserver to Federation ---
+  home_server -down-( ss_api
+  ss_api -down- remote_server
+
+  ' --- Homeserver to Application Service ---
+  home_server -down-( as_api
+  as_api -down- app_service
+  app_service -down-( external_networks
+
+  ' --- Homeserver to Identity Service ---
+  home_server -down-( id_api
+  id_api -down- identity_server
+  identity_server -down-( external_idp
+
+  ' --- Homeserver to Push Gateway ---
+  home_server -down-( push_api
+  push_api -down- push_gateway
+  push_gateway -down-( push_providers
+}
+
+@enduml
