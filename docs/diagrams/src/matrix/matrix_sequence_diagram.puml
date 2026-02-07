@@ -1,0 +1,59 @@
+@startuml
+!theme plain
+autonumber
+
+title Matrix Media Message Flow
+
+' Simplified sequence without nested boxes to avoid PlantUML syntax errors on some servers
+
+actor Alice
+actor Bob
+participant Client
+participant HS_A as "Alice HomeServer"
+participant MediaA as "Media Repo A"
+participant DB_A as "Database A"
+participant Federation as "Federation Queue"
+participant HS_B as "Bob HomeServer"
+participant MediaB as "Media Repo B"
+participant DB_B as "Database B"
+participant PushProvider as "Push Provider"
+
+group Upload
+    Alice -> Client: Choose file
+    Client -> HS_A: Upload file chunks
+    HS_A -> MediaA: Store chunks
+    MediaA --> HS_A: Return MXC URI
+    HS_A --> Client: MXC URI
+end
+
+group Send Message
+    Client -> HS_A: Send message with MXC
+    HS_A -> DB_A: Persist event
+    HS_A -> Federation: Replicate event
+    HS_A --> Client: Ack
+end
+
+group Federation
+    Federation -> HS_B: Deliver event
+    HS_B -> DB_B: Persist event
+end
+
+group Delivery
+    HS_B -> PushProvider: Push message
+    PushProvider --> Bob: Notify
+    Bob -> HS_B: Open app
+    HS_B -> DB_B: Get event
+    alt Media cached
+        HS_B -> MediaB: Access media
+        MediaB --> HS_B: Data
+    else
+        HS_B -> HS_A: Download media
+        HS_A -> MediaA: Read media
+        MediaA --> HS_A: Data
+        HS_A --> HS_B: Data
+        HS_B -> MediaB: Store media
+    end
+    HS_B --> Bob: Deliver message and media
+end
+
+@enduml
