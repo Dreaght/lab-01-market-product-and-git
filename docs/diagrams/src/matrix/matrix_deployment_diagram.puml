@@ -1,0 +1,130 @@
+@startuml Deployment Diagram
+!theme plain
+
+skinparam node {
+  BackgroundColor WhiteSmoke
+  BorderColor DarkBlue
+  ArrowColor #444444
+}
+
+skinparam component {
+  BackgroundColor White
+  BorderColor Black
+}
+
+skinparam database {
+  BackgroundColor White
+  BorderColor Black
+}
+
+title Matrix Deployment Diagram (Physical View)
+
+' This deployment diagram shows a typical federated Matrix setup with two
+' organisations running their own homeservers. Each organisation hosts a
+' homeserver, media repository, application service and push gateway within its
+' infrastructure, while clients connect over the Internet. Homeservers
+' federate via the server–server API to exchange room events, and may use
+' identity services for mapping third‑party identifiers【337213950775020†L117-L134】.
+
+' --- Client Tier ---
+node "User Smartphone" <<device>> as SmartPhone {
+  component [Matrix Mobile Client] as mobile_app
+}
+
+node "User Computer" <<device>> as Computer {
+  component [Matrix Desktop Client] as desktop_app
+  node "Web Browser" <<execution environment>> {
+    component [Matrix Web Client] as web_app
+  }
+}
+
+' --- Third‑Party Bridge ---
+node "Bridge Server" <<server>> as BridgeServer {
+  component [Application Service / Bridge] as ext_as
+}
+
+' --- Federated Infrastructure: Org A ---
+cloud "Organisation A Data Centre" {
+  node "Homeserver A" <<server>> as hsA {
+    component [Home Server A] as homeA
+    component [Push Gateway A] as pushA
+    component [Application Service A] as appA
+  }
+  node "Storage & Cache A" <<database>> as storageA {
+    database [Event & State Store A] as dbA
+    component [Media Repository A] as mediaA
+    component [Cache A] as cacheA
+  }
+}
+
+' --- Federated Infrastructure: Org B ---
+cloud "Organisation B Data Centre" {
+  node "Homeserver B" <<server>> as hsB {
+    component [Home Server B] as homeB
+    component [Push Gateway B] as pushB
+    component [Application Service B] as appB
+  }
+  node "Storage & Cache B" <<database>> as storageB {
+    database [Event & State Store B] as dbB
+    component [Media Repository B] as mediaB
+    component [Cache B] as cacheB
+  }
+}
+
+' --- Shared Services ---
+cloud "Identity Services" {
+  component [Identity Server] as id_server
+}
+
+cloud "External Networks" {
+  component [Other Chat Networks] as ext_networks
+}
+
+cloud "Push Providers" {
+  component [FCM/APNs] as push_prov
+}
+
+' --- Connections ---
+
+' Clients connect to their local homeserver using the client–server API【416664241563343†L103-L112】
+mobile_app --> homeA : Client–Server API (HTTPS)
+desktop_app --> homeA : Client–Server API (HTTPS)
+web_app --> homeA : Client–Server API (HTTPS)
+
+' Homeserver A talks to its storage
+homeA --> dbA : SQL
+homeA --> mediaA : Media API
+homeA ..> cacheA : Cache
+
+' Homeserver A interacts with its application service and push gateway
+homeA --> appA : AS API (HTTP)
+appA --> ext_networks : Protocol‑specific API
+
+homeA --> pushA : Push API (HTTP)
+pushA --> push_prov : APNs/FCM
+
+' Homeserver A uses identity services
+homeA --> id_server : Identity API (HTTPS)
+
+' Federation between homeservers【416664241563343†L113-L116】
+homeA --> homeB : Server–Server API (HTTPS)
+
+' Homeserver B mirrors the same interactions
+homeB --> dbB : SQL
+homeB --> mediaB : Media API
+homeB ..> cacheB : Cache
+homeB --> appB : AS API (HTTP)
+appB --> ext_networks : Protocol‑specific API
+homeB --> pushB : Push API (HTTP)
+pushB --> push_prov : APNs/FCM
+homeB --> id_server : Identity API (HTTPS)
+
+' Third‑party bridge server interacts with organisation A's homeserver as an application service【337213950775020†L117-L134】
+ext_as --> homeA : AS API (HTTP)
+ext_as --> ext_networks : External protocols
+
+' Client B connecting to Home B (federated) is implicit; for clarity, show a remote client
+actor "User Bob" as Bob
+Bob --> homeB : Client–Server API (HTTPS)
+
+@enduml
